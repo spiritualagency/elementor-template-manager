@@ -228,8 +228,8 @@
 								${kit.preview ? 'Change Image' : 'Add Image'}
 							</button>
 							<div class="etkm-card-actions">
-								<button type="button" class="button button-primary etkm-import-btn" data-filename="${escapeHtml(kit.name)}">
-									<span class="dashicons dashicons-download"></span> Import
+								<button type="button" class="button button-primary etkm-upload-to-elementor-btn" data-filename="${escapeHtml(kit.name)}">
+									<span class="dashicons dashicons-upload"></span> Upload to Elementor
 								</button>
 								<button type="button" class="button button-secondary etkm-delete-btn" data-filename="${escapeHtml(kit.name)}">
 									<span class="dashicons dashicons-trash"></span> Delete
@@ -261,8 +261,8 @@
 							<button type="button" class="button etkm-add-image-btn-list" data-filename="${escapeHtml(kit.name)}">
 								<span class="dashicons dashicons-format-image"></span> ${kit.preview ? 'Change' : 'Add'} Image
 							</button>
-							<button type="button" class="button button-primary etkm-import-btn" data-filename="${escapeHtml(kit.name)}">
-								<span class="dashicons dashicons-download"></span> Import
+							<button type="button" class="button button-primary etkm-upload-to-elementor-btn" data-filename="${escapeHtml(kit.name)}">
+								<span class="dashicons dashicons-upload"></span> Upload to Elementor
 							</button>
 							<button type="button" class="button etkm-delete-btn" data-filename="${escapeHtml(kit.name)}">
 								<span class="dashicons dashicons-trash"></span> Delete
@@ -279,24 +279,18 @@
 		if (currentView === 'gallery') {
 			document.querySelectorAll('.etkm-gallery-card').forEach(function(card) {
 				card.addEventListener('click', function(e) {
-					if (!e.target.closest('.etkm-import-btn') && 
+					if (!e.target.closest('.etkm-upload-to-elementor-btn') && 
 						!e.target.closest('.etkm-delete-btn') && 
 						!e.target.closest('.etkm-add-image-btn')) {
 						const filename = this.dataset.filename;
-						if (selectedKits.has(filename)) {
-							selectedKits.delete(filename);
-							this.classList.remove('selected');
-						} else {
-							selectedKits.add(filename);
-							this.classList.add('selected');
-						}
+						handleUploadToElementor({ currentTarget: this.querySelector('.etkm-upload-to-elementor-btn') });
 					}
 				});
 			});
 		}
 
-		document.querySelectorAll('.etkm-import-btn').forEach(function(btn) {
-			btn.addEventListener('click', handleImport);
+		document.querySelectorAll('.etkm-upload-to-elementor-btn').forEach(function(btn) {
+			btn.addEventListener('click', handleUploadToElementor);
 		});
 
 		document.querySelectorAll('.etkm-delete-btn').forEach(function(btn) {
@@ -371,53 +365,17 @@
 		});
 	}
 
-	function handleImport(e) {
+	function handleUploadToElementor(e) {
 		e.stopPropagation();
 		const btn = e.currentTarget;
 		const filename = btn.dataset.filename;
-		const originalText = btn.innerHTML;
 
-		if (btn.disabled) {
-			return;
-		}
+		// Show confirmation message
+		showNotification('Redirecting to Elementor Tools...', 'success');
 
-		btn.disabled = true;
-		btn.innerHTML = '<span class="spinner is-active" style="float: none; margin: 0 8px 0 0;"></span>Importing...';
-
-		fetch(etkm.ajaxUrl, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/x-www-form-urlencoded',
-			},
-			body: new URLSearchParams({
-				action: 'etkm_import_kit',
-				nonce: etkm.nonce,
-				filename: filename
-			})
-		})
-		.then(response => response.json())
-		.then(data => {
-			if (data.success) {
-				let message = data.data.message;
-				if (data.data.imported && data.data.imported.length > 0) {
-					message += '<ul>';
-					data.data.imported.forEach(function(template) {
-						message += '<li>' + escapeHtml(template.title) + ' (' + escapeHtml(template.type) + ')</li>';
-					});
-					message += '</ul>';
-				}
-				showNotification(message, 'success');
-			} else {
-				showNotification(data.data.message || etkm.strings.importError, 'error');
-			}
-			btn.disabled = false;
-			btn.innerHTML = originalText;
-		})
-		.catch(error => {
-			showNotification(etkm.strings.importError, 'error');
-			btn.disabled = false;
-			btn.innerHTML = originalText;
-		});
+		// Redirect to Elementor tools page with the kit filename
+		const elementorToolsUrl = etkm.adminUrl + 'admin.php?page=elementor-tools&action=upload_kit&kit_file=' + encodeURIComponent(filename) + '&nonce=' + etkm.nonce;
+		window.location.href = elementorToolsUrl;
 	}
 
 	function handleDelete(e) {
