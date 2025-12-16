@@ -43,6 +43,9 @@ function etkm_init() {
 	
 	// Enqueue admin scripts
 	add_action( 'admin_enqueue_scripts', 'etkm_enqueue_admin_scripts' );
+	
+	// Handle Elementor tools page redirect
+	add_action( 'admin_init', 'etkm_handle_elementor_upload_redirect' );
 }
 add_action( 'plugins_loaded', 'etkm_init' );
 
@@ -126,6 +129,7 @@ function etkm_enqueue_admin_scripts( $hook ) {
 		'etkm',
 		array(
 			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+			'adminUrl' => admin_url(),
 			'nonce' => wp_create_nonce( 'etkm_nonce' ),
 			'maxFileSize' => wp_max_upload_size(),
 			'uploadUrl' => etkm_get_upload_url(),
@@ -143,6 +147,77 @@ function etkm_enqueue_admin_scripts( $hook ) {
 			)
 		)
 	);
+}
+
+/**
+ * Handle redirect to Elementor tools page
+ */
+function etkm_handle_elementor_upload_redirect() {
+	if ( ! isset( $_GET['page'] ) || 'elementor-tools' !== $_GET['page'] ) {
+		return;
+	}
+	
+	if ( ! isset( $_GET['action'] ) || 'upload_kit' !== $_GET['action'] ) {
+		return;
+	}
+	
+	if ( ! isset( $_GET['kit_file'] ) || ! isset( $_GET['nonce'] ) ) {
+		return;
+	}
+	
+	if ( ! wp_verify_nonce( $_GET['nonce'], 'etkm_nonce' ) ) {
+		return;
+	}
+	
+	if ( ! current_user_can( 'manage_options' ) ) {
+		return;
+	}
+	
+	$filename = sanitize_file_name( $_GET['kit_file'] );
+	$upload_dir = etkm_get_upload_dir();
+	$filepath = $upload_dir . '/' . $filename;
+	
+	if ( ! file_exists( $filepath ) ) {
+		wp_die( esc_html__( 'Template kit file not found.', 'elementor-template-kit-manager' ) );
+	}
+	
+	// Add hook to inject the file into Elementor's upload handler
+	add_action( 'elementor/tools/after_general_tab', function() use ( $filepath, $filename ) {
+		?>
+		<script type="text/javascript">
+		jQuery(document).ready(function($) {
+			// Auto-trigger upload with our file
+			var fileInput = $('#elementor-import-template-trigger, input[name="file"], input[type="file"][accept=".zip"]').first();
+			
+			if (fileInput.length) {
+				// Create a notice
+				var notice = $('<div class="notice notice-info is-dismissible"><p><strong>Template Kit Manager:</strong> Ready to upload "<?php echo esc_js( $filename ); ?>"</p></div>');
+				$('.elementor-panel-scheme-items, .elementor-panel-scheme-content').first().prepend(notice);
+				
+				// Create a custom file object
+				fetch('<?php echo esc_url( etkm_get_upload_url() . '/' . $filename ); ?>')
+					.then(function(response) { return response.blob(); })
+					.then(function(blob) {
+						var file = new File([blob], '<?php echo esc_js( $filename ); ?>', { type: 'application/zip' });
+						var dataTransfer = new DataTransfer();
+						dataTransfer.items.add(file);
+						fileInput[0].files = dataTransfer.files;
+						
+						// Trigger change event
+						fileInput.trigger('change');
+						
+						// Update notice
+						notice.find('p').html('<strong>Template Kit Manager:</strong> File loaded! Click "Import Now" to continue.');
+					})
+					.catch(function(error) {
+						notice.removeClass('notice-info').addClass('notice-error');
+						notice.find('p').html('<strong>Template Kit Manager:</strong> Failed to load file. ' + error.message);
+					});
+			}
+		});
+		</script>
+		<?php
+	}, 5 );
 }
 
 /**
