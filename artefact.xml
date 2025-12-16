@@ -1,0 +1,1940 @@
+<?xml version="1.0"?><artefact xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="artefact.xsd" name="Elementor Template Kit Manager" slug="elementor-template-kit-manager" type="code-package" schemaVersion="2">
+  <file path="readme.txt">
+    <description>This file contains the readme information for the block. It is used to provide information about the block, its usage, and any other relevant details.</description>
+    <content><![CDATA[
+=== Elementor Template Kit Manager ===
+
+Contributors:      WordPress Telex
+Tags:              elementor, templates, template kits, import, export
+Tested up to:      6.8
+Stable tag:        0.1.0
+License:           GPLv2 or later
+License URI:       https://www.gnu.org/licenses/gpl-2.0.html
+Requires at least: 5.8
+Requires PHP:      7.4
+
+A powerful WordPress plugin for managing and deploying Elementor template kits stored as ZIP files.
+
+== Description ==
+
+Elementor Template Kit Manager is a comprehensive solution for WordPress administrators who need to manage, store, and deploy complete Elementor website template packages. This plugin streamlines the process of importing pre-designed Elementor templates, making it easy to set up new websites or add new sections to existing ones.
+
+**Key Features:**
+
+* **Upload Template Kits**: Upload complete Elementor template ZIP files directly through the WordPress admin interface
+* **Drag & Drop Interface**: Modern drag-and-drop upload functionality for seamless file management
+* **Template Library**: View all available template kits in a clean, organized list view
+* **Quick Deployment**: One-click import functionality to deploy templates directly into Elementor
+* **File Validation**: Automatic validation ensures only valid Elementor template ZIPs are accepted
+* **Progress Indicators**: Real-time progress feedback during upload and deployment processes
+* **Detailed Information**: See template kit names, upload dates, and file sizes at a glance
+* **Error Handling**: Clear, informative error messages for troubleshooting failed imports
+* **Metadata Preservation**: Maintains all template metadata and dependencies during import
+* **Elementor Compatible**: Seamlessly integrates with Elementor's native import system
+
+**Perfect For:**
+
+* Web agencies managing multiple client sites
+* Developers who frequently deploy template kits
+* WordPress administrators maintaining template libraries
+* Anyone working with Elementor templates regularly
+
+== Installation ==
+
+1. Ensure Elementor is installed and activated on your WordPress site
+2. Upload the plugin files to the `/wp-content/plugins/elementor-template-kit-manager` directory, or install the plugin through the WordPress plugins screen directly
+3. Activate the plugin through the 'Plugins' screen in WordPress
+4. Navigate to 'Template Kits' in the WordPress admin menu to start managing your template kits
+
+== Frequently Asked Questions ==
+
+= Does this plugin require Elementor? =
+
+Yes, this plugin is designed specifically to work with Elementor and requires Elementor to be installed and activated.
+
+= What file formats are supported? =
+
+The plugin accepts ZIP files containing Elementor template exports. Files must follow Elementor's standard template export format.
+
+= Where are the uploaded template kits stored? =
+
+Template kits are stored in a dedicated directory within your WordPress uploads folder for easy management and backup.
+
+= Can I delete template kits after importing them? =
+
+Yes, you can delete template kit ZIP files from the library at any time. This won't affect templates that have already been imported into Elementor.
+
+= Is there a file size limit for uploads? =
+
+Upload limits are determined by your server's PHP configuration (upload_max_filesize and post_max_size). You can increase these limits in your php.ini file if needed.
+
+= What happens if an import fails? =
+
+The plugin provides detailed error messages to help troubleshoot import failures. Common issues include corrupted ZIP files, insufficient permissions, or incompatible template formats.
+
+== Screenshots ==
+
+1. Main template kit library view showing all available kits with their details
+2. Drag and drop upload interface for adding new template kits
+3. Import progress indicator during template deployment
+4. Success confirmation showing all imported templates
+5. Error handling with clear troubleshooting messages
+
+== Changelog ==
+
+= 0.1.0 =
+* Initial release
+* Upload and manage Elementor template kit ZIP files
+* One-click import functionality
+* Drag and drop upload interface
+* File validation and error handling
+* Progress indicators for uploads and imports
+* Template kit library with detailed information
+
+== Additional Information ==
+
+**Requirements:**
+
+* WordPress 5.8 or higher
+* PHP 7.4 or higher
+* Elementor (free or pro version)
+* Sufficient server storage for template kits
+* PHP ZipArchive extension enabled
+
+**Support:**
+
+For support, feature requests, or bug reports, please visit the plugin support forum.
+
+**Privacy:**
+
+This plugin does not collect or transmit any user data. All template kits are stored locally on your WordPress server.
+]]></content>
+  </file>
+  <file path="elementor-template-kit-manager.php">
+    <description>This file contains the main plugin file with all admin functionality for managing Elementor template kits.</description>
+    <content><![CDATA[<?php
+/**
+ * Plugin Name:       Elementor Template Kit Manager
+ * Description:       Manage and deploy Elementor template kits stored as ZIP files. Upload, store, and import complete template packages with a simple admin interface.
+ * Version:           0.1.0
+ * Requires at least: 5.8
+ * Requires PHP:      7.4
+ * Author:            WordPress Telex
+ * License:           GPLv2 or later
+ * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
+ * Text Domain:       elementor-template-kit-manager
+ *
+ * @package ElementorTemplateKitManager
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+define( 'ETKM_VERSION', '0.1.0' );
+define( 'ETKM_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
+define( 'ETKM_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
+
+/**
+ * Initialize the plugin
+ */
+function etkm_init() {
+	// Check if Elementor is installed
+	if ( ! did_action( 'elementor/loaded' ) ) {
+		add_action( 'admin_notices', 'etkm_elementor_missing_notice' );
+		return;
+	}
+
+	// Add admin menu
+	add_action( 'admin_menu', 'etkm_add_admin_menu' );
+	
+	// Register AJAX handlers
+	add_action( 'wp_ajax_etkm_upload_kit', 'etkm_handle_upload' );
+	add_action( 'wp_ajax_etkm_import_kit', 'etkm_handle_import' );
+	add_action( 'wp_ajax_etkm_delete_kit', 'etkm_handle_delete' );
+	add_action( 'wp_ajax_etkm_get_kits', 'etkm_get_kits_ajax' );
+	add_action( 'wp_ajax_etkm_upload_image', 'etkm_handle_image_upload' );
+	
+	// Enqueue admin scripts
+	add_action( 'admin_enqueue_scripts', 'etkm_enqueue_admin_scripts' );
+}
+add_action( 'plugins_loaded', 'etkm_init' );
+
+/**
+ * Show notice if Elementor is not installed
+ */
+function etkm_elementor_missing_notice() {
+	?>
+	<div class="notice notice-error">
+		<p><?php esc_html_e( 'Elementor Template Kit Manager requires Elementor to be installed and activated.', 'elementor-template-kit-manager' ); ?></p>
+	</div>
+	<?php
+}
+
+/**
+ * Add admin menu
+ */
+function etkm_add_admin_menu() {
+	add_menu_page(
+		__( 'Template Kits', 'elementor-template-kit-manager' ),
+		__( 'Template Kits', 'elementor-template-kit-manager' ),
+		'manage_options',
+		'elementor-template-kits',
+		'etkm_render_admin_page',
+		'dashicons-download',
+		59
+	);
+}
+
+/**
+ * Get upload directory for template kits
+ */
+function etkm_get_upload_dir() {
+	$upload_dir = wp_upload_dir();
+	$kit_dir = $upload_dir['basedir'] . '/elementor-template-kits';
+	
+	if ( ! file_exists( $kit_dir ) ) {
+		wp_mkdir_p( $kit_dir );
+		// Add index.php for security
+		file_put_contents( $kit_dir . '/index.php', '<?php // Silence is golden' );
+	}
+	
+	return $kit_dir;
+}
+
+/**
+ * Get URL for upload directory
+ */
+function etkm_get_upload_url() {
+	$upload_dir = wp_upload_dir();
+	return $upload_dir['baseurl'] . '/elementor-template-kits';
+}
+
+/**
+ * Enqueue admin scripts and styles
+ */
+function etkm_enqueue_admin_scripts( $hook ) {
+	if ( 'toplevel_page_elementor-template-kits' !== $hook ) {
+		return;
+	}
+	
+	wp_enqueue_media();
+	
+	wp_enqueue_style(
+		'etkm-admin-style',
+		ETKM_PLUGIN_URL . 'build/style-index.css',
+		array(),
+		ETKM_VERSION
+	);
+	
+	wp_enqueue_script(
+		'etkm-admin-script',
+		ETKM_PLUGIN_URL . 'build/view.js',
+		array(),
+		ETKM_VERSION,
+		true
+	);
+	
+	wp_localize_script(
+		'etkm-admin-script',
+		'etkm',
+		array(
+			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+			'nonce' => wp_create_nonce( 'etkm_nonce' ),
+			'maxFileSize' => wp_max_upload_size(),
+			'uploadUrl' => etkm_get_upload_url(),
+			'strings' => array(
+				'uploadSuccess' => __( 'Template kit uploaded successfully!', 'elementor-template-kit-manager' ),
+				'uploadError' => __( 'Upload failed. Please try again.', 'elementor-template-kit-manager' ),
+				'importSuccess' => __( 'Templates imported successfully!', 'elementor-template-kit-manager' ),
+				'importError' => __( 'Import failed. Please check the file and try again.', 'elementor-template-kit-manager' ),
+				'deleteConfirm' => __( 'Are you sure you want to delete this template kit?', 'elementor-template-kit-manager' ),
+				'deleteSuccess' => __( 'Template kit deleted successfully.', 'elementor-template-kit-manager' ),
+				'invalidFile' => __( 'Please select a valid ZIP file.', 'elementor-template-kit-manager' ),
+				'fileTooLarge' => __( 'File size exceeds the maximum allowed size.', 'elementor-template-kit-manager' ),
+				'imageUploadSuccess' => __( 'Image uploaded successfully!', 'elementor-template-kit-manager' ),
+				'imageUploadError' => __( 'Failed to upload image.', 'elementor-template-kit-manager' ),
+			)
+		)
+	);
+}
+
+/**
+ * Render admin page
+ */
+function etkm_render_admin_page() {
+	?>
+	<div class="wrap etkm-admin-wrap">
+		<h1><?php esc_html_e( 'Elementor Template Kit Manager', 'elementor-template-kit-manager' ); ?></h1>
+		
+		<div class="etkm-upload-section">
+			<h2><?php esc_html_e( 'Upload New Template Kit', 'elementor-template-kit-manager' ); ?></h2>
+			<div class="etkm-upload-area" id="etkm-upload-area">
+				<div class="etkm-upload-content">
+					<span class="dashicons dashicons-upload"></span>
+					<p><?php esc_html_e( 'Drag and drop your Elementor template kit ZIP file here', 'elementor-template-kit-manager' ); ?></p>
+					<p class="etkm-or"><?php esc_html_e( 'or', 'elementor-template-kit-manager' ); ?></p>
+					<button type="button" class="button button-primary" id="etkm-select-file">
+						<?php esc_html_e( 'Select File', 'elementor-template-kit-manager' ); ?>
+					</button>
+					<input type="file" id="etkm-file-input" accept=".zip" style="display: none;">
+					<p class="etkm-file-info">
+						<?php
+						printf(
+							/* translators: %s: maximum file size */
+							esc_html__( 'Maximum file size: %s', 'elementor-template-kit-manager' ),
+							esc_html( size_format( wp_max_upload_size() ) )
+						);
+						?>
+					</p>
+				</div>
+				<div class="etkm-upload-progress" style="display: none;">
+					<div class="etkm-progress-bar">
+						<div class="etkm-progress-fill"></div>
+					</div>
+					<p class="etkm-progress-text">0%</p>
+				</div>
+			</div>
+		</div>
+		
+		<div class="etkm-kits-section">
+			<div class="etkm-section-header">
+				<h2><?php esc_html_e( 'Template Kit Gallery', 'elementor-template-kit-manager' ); ?></h2>
+				<div class="etkm-view-toggle">
+					<button type="button" class="etkm-view-btn active" data-view="gallery">
+						<span class="dashicons dashicons-grid-view"></span>
+						<?php esc_html_e( 'Gallery', 'elementor-template-kit-manager' ); ?>
+					</button>
+					<button type="button" class="etkm-view-btn" data-view="list">
+						<span class="dashicons dashicons-list-view"></span>
+						<?php esc_html_e( 'List', 'elementor-template-kit-manager' ); ?>
+					</button>
+				</div>
+			</div>
+			<div id="etkm-kits-list" class="etkm-kits-list etkm-gallery-view">
+				<div class="etkm-loading">
+					<span class="spinner is-active"></span>
+					<p><?php esc_html_e( 'Loading template kits...', 'elementor-template-kit-manager' ); ?></p>
+				</div>
+			</div>
+		</div>
+		
+		<div id="etkm-notification" class="etkm-notification" style="display: none;"></div>
+	</div>
+	<?php
+}
+
+/**
+ * Handle file upload via AJAX
+ */
+function etkm_handle_upload() {
+	check_ajax_referer( 'etkm_nonce', 'nonce' );
+	
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'elementor-template-kit-manager' ) ) );
+	}
+	
+	if ( empty( $_FILES['file'] ) ) {
+		wp_send_json_error( array( 'message' => __( 'No file uploaded.', 'elementor-template-kit-manager' ) ) );
+	}
+	
+	$file = $_FILES['file'];
+	
+	// Validate file type
+	$file_type = wp_check_filetype( $file['name'] );
+	if ( 'zip' !== $file_type['ext'] ) {
+		wp_send_json_error( array( 'message' => __( 'Only ZIP files are allowed.', 'elementor-template-kit-manager' ) ) );
+	}
+	
+	// Validate file size
+	if ( $file['size'] > wp_max_upload_size() ) {
+		wp_send_json_error( array( 'message' => __( 'File size exceeds the maximum allowed size.', 'elementor-template-kit-manager' ) ) );
+	}
+	
+	$upload_dir = etkm_get_upload_dir();
+	$filename = sanitize_file_name( $file['name'] );
+	$destination = $upload_dir . '/' . $filename;
+	
+	// Check if file already exists
+	if ( file_exists( $destination ) ) {
+		$filename = wp_unique_filename( $upload_dir, $filename );
+		$destination = $upload_dir . '/' . $filename;
+	}
+	
+	if ( move_uploaded_file( $file['tmp_name'], $destination ) ) {
+		// Try to extract preview image
+		etkm_extract_preview_image( $destination, $filename );
+		
+		wp_send_json_success( array(
+			'message' => __( 'Template kit uploaded successfully!', 'elementor-template-kit-manager' ),
+			'filename' => $filename
+		) );
+	} else {
+		wp_send_json_error( array( 'message' => __( 'Failed to upload file.', 'elementor-template-kit-manager' ) ) );
+	}
+}
+
+/**
+ * Extract preview image from ZIP
+ */
+function etkm_extract_preview_image( $zip_path, $filename ) {
+	if ( ! class_exists( 'ZipArchive' ) ) {
+		return;
+	}
+	
+	$zip = new ZipArchive();
+	if ( true !== $zip->open( $zip_path ) ) {
+		return;
+	}
+	
+	$upload_dir = etkm_get_upload_dir();
+	$preview_dir = $upload_dir . '/previews';
+	
+	if ( ! file_exists( $preview_dir ) ) {
+		wp_mkdir_p( $preview_dir );
+	}
+	
+	// Look for common preview image names
+	$preview_names = array( 'preview.jpg', 'preview.png', 'thumbnail.jpg', 'thumbnail.png', 'screenshot.jpg', 'screenshot.png' );
+	
+	for ( $i = 0; $i < $zip->numFiles; $i++ ) {
+		$file_info = $zip->statIndex( $i );
+		$file_name = basename( $file_info['name'] );
+		
+		if ( in_array( strtolower( $file_name ), $preview_names ) ) {
+			$preview_content = $zip->getFromIndex( $i );
+			if ( $preview_content ) {
+				$preview_filename = pathinfo( $filename, PATHINFO_FILENAME ) . '.' . pathinfo( $file_name, PATHINFO_EXTENSION );
+				file_put_contents( $preview_dir . '/' . $preview_filename, $preview_content );
+				break;
+			}
+		}
+	}
+	
+	$zip->close();
+}
+
+/**
+ * Handle image upload via AJAX
+ */
+function etkm_handle_image_upload() {
+	check_ajax_referer( 'etkm_nonce', 'nonce' );
+	
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'elementor-template-kit-manager' ) ) );
+	}
+	
+	$kit_filename = isset( $_POST['kit_filename'] ) ? sanitize_file_name( $_POST['kit_filename'] ) : '';
+	$image_id = isset( $_POST['image_id'] ) ? intval( $_POST['image_id'] ) : 0;
+	
+	if ( empty( $kit_filename ) || empty( $image_id ) ) {
+		wp_send_json_error( array( 'message' => __( 'Invalid parameters.', 'elementor-template-kit-manager' ) ) );
+	}
+	
+	// Get the attachment URL
+	$image_url = wp_get_attachment_image_url( $image_id, 'large' );
+	if ( ! $image_url ) {
+		wp_send_json_error( array( 'message' => __( 'Invalid image.', 'elementor-template-kit-manager' ) ) );
+	}
+	
+	// Copy the image to our preview directory
+	$image_path = get_attached_file( $image_id );
+	if ( ! $image_path || ! file_exists( $image_path ) ) {
+		wp_send_json_error( array( 'message' => __( 'Image file not found.', 'elementor-template-kit-manager' ) ) );
+	}
+	
+	$upload_dir = etkm_get_upload_dir();
+	$preview_dir = $upload_dir . '/previews';
+	
+	if ( ! file_exists( $preview_dir ) ) {
+		wp_mkdir_p( $preview_dir );
+	}
+	
+	// Delete any existing preview images for this kit
+	$base_filename = pathinfo( $kit_filename, PATHINFO_FILENAME );
+	$extensions = array( 'jpg', 'png', 'jpeg' );
+	foreach ( $extensions as $ext ) {
+		$old_preview = $preview_dir . '/' . $base_filename . '.' . $ext;
+		if ( file_exists( $old_preview ) ) {
+			unlink( $old_preview );
+		}
+	}
+	
+	// Copy the new image
+	$extension = pathinfo( $image_path, PATHINFO_EXTENSION );
+	$preview_filename = $base_filename . '.' . $extension;
+	$preview_path = $preview_dir . '/' . $preview_filename;
+	
+	if ( copy( $image_path, $preview_path ) ) {
+		$preview_url = etkm_get_upload_url() . '/previews/' . $preview_filename;
+		wp_send_json_success( array(
+			'message' => __( 'Image uploaded successfully!', 'elementor-template-kit-manager' ),
+			'preview_url' => $preview_url
+		) );
+	} else {
+		wp_send_json_error( array( 'message' => __( 'Failed to save image.', 'elementor-template-kit-manager' ) ) );
+	}
+}
+
+/**
+ * Get all template kits via AJAX
+ */
+function etkm_get_kits_ajax() {
+	check_ajax_referer( 'etkm_nonce', 'nonce' );
+	
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'elementor-template-kit-manager' ) ) );
+	}
+	
+	$kits = etkm_get_template_kits();
+	wp_send_json_success( array( 'kits' => $kits ) );
+}
+
+/**
+ * Get all template kits
+ */
+function etkm_get_template_kits() {
+	$upload_dir = etkm_get_upload_dir();
+	$upload_url = etkm_get_upload_url();
+	$kits = array();
+	
+	if ( ! is_dir( $upload_dir ) ) {
+		return $kits;
+	}
+	
+	$files = scandir( $upload_dir );
+	
+	foreach ( $files as $file ) {
+		if ( '.' === $file || '..' === $file || 'index.php' === $file || 'previews' === $file ) {
+			continue;
+		}
+		
+		$filepath = $upload_dir . '/' . $file;
+		
+		if ( is_file( $filepath ) && 'zip' === pathinfo( $file, PATHINFO_EXTENSION ) ) {
+			$preview_url = etkm_get_preview_url( $file );
+			
+			$kits[] = array(
+				'name' => $file,
+				'display_name' => etkm_format_kit_name( $file ),
+				'size' => size_format( filesize( $filepath ), 2 ),
+				'date' => date_i18n( get_option( 'date_format' ), filemtime( $filepath ) ),
+				'timestamp' => filemtime( $filepath ),
+				'preview' => $preview_url
+			);
+		}
+	}
+	
+	// Sort by date, newest first
+	usort( $kits, function( $a, $b ) {
+		return $b['timestamp'] - $a['timestamp'];
+	});
+	
+	return $kits;
+}
+
+/**
+ * Get preview URL for a kit
+ */
+function etkm_get_preview_url( $filename ) {
+	$upload_dir = etkm_get_upload_dir();
+	$upload_url = etkm_get_upload_url();
+	$preview_dir = $upload_dir . '/previews';
+	
+	$base_filename = pathinfo( $filename, PATHINFO_FILENAME );
+	$extensions = array( 'jpg', 'png', 'jpeg' );
+	
+	foreach ( $extensions as $ext ) {
+		$preview_file = $preview_dir . '/' . $base_filename . '.' . $ext;
+		if ( file_exists( $preview_file ) ) {
+			return $upload_url . '/previews/' . $base_filename . '.' . $ext;
+		}
+	}
+	
+	return false;
+}
+
+/**
+ * Format kit name for display
+ */
+function etkm_format_kit_name( $filename ) {
+	$name = pathinfo( $filename, PATHINFO_FILENAME );
+	$name = str_replace( array( '-', '_' ), ' ', $name );
+	$name = ucwords( $name );
+	return $name;
+}
+
+/**
+ * Handle template import via AJAX
+ */
+function etkm_handle_import() {
+	check_ajax_referer( 'etkm_nonce', 'nonce' );
+	
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'elementor-template-kit-manager' ) ) );
+	}
+	
+	$filename = isset( $_POST['filename'] ) ? sanitize_file_name( $_POST['filename'] ) : '';
+	
+	if ( empty( $filename ) ) {
+		wp_send_json_error( array( 'message' => __( 'Invalid filename.', 'elementor-template-kit-manager' ) ) );
+	}
+	
+	$upload_dir = etkm_get_upload_dir();
+	$filepath = $upload_dir . '/' . $filename;
+	
+	if ( ! file_exists( $filepath ) ) {
+		wp_send_json_error( array( 'message' => __( 'File not found.', 'elementor-template-kit-manager' ) ) );
+	}
+	
+	// Import the template kit
+	$result = etkm_import_template_kit( $filepath );
+	
+	if ( is_wp_error( $result ) ) {
+		wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+	}
+	
+	wp_send_json_success( array(
+		'message' => __( 'Template kit imported successfully!', 'elementor-template-kit-manager' ),
+		'imported' => $result
+	) );
+}
+
+/**
+ * Import template kit
+ */
+function etkm_import_template_kit( $filepath ) {
+	if ( ! class_exists( 'ZipArchive' ) ) {
+		return new WP_Error( 'zip_error', __( 'ZipArchive extension is not available.', 'elementor-template-kit-manager' ) );
+	}
+	
+	$zip = new ZipArchive();
+	
+	if ( true !== $zip->open( $filepath ) ) {
+		return new WP_Error( 'zip_error', __( 'Failed to open ZIP file.', 'elementor-template-kit-manager' ) );
+	}
+	
+	$temp_dir = get_temp_dir() . 'etkm_' . uniqid();
+	wp_mkdir_p( $temp_dir );
+	
+	$zip->extractTo( $temp_dir );
+	$zip->close();
+	
+	// Find and import JSON files
+	$imported_templates = array();
+	$iterator = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $temp_dir ) );
+	
+	foreach ( $iterator as $file ) {
+		if ( $file->isFile() && 'json' === $file->getExtension() ) {
+			$json_content = file_get_contents( $file->getPathname() );
+			$template_data = json_decode( $json_content, true );
+			
+			if ( ! empty( $template_data ) && isset( $template_data['content'] ) ) {
+				$result = etkm_import_single_template( $template_data );
+				if ( ! is_wp_error( $result ) ) {
+					$imported_templates[] = array(
+						'title' => isset( $template_data['title'] ) ? $template_data['title'] : basename( $file->getFilename(), '.json' ),
+						'type' => isset( $template_data['type'] ) ? $template_data['type'] : 'page',
+						'id' => $result
+					);
+				}
+			}
+		}
+	}
+	
+	// Clean up temp directory
+	etkm_delete_directory( $temp_dir );
+	
+	if ( empty( $imported_templates ) ) {
+		return new WP_Error( 'import_error', __( 'No valid templates found in the ZIP file.', 'elementor-template-kit-manager' ) );
+	}
+	
+	return $imported_templates;
+}
+
+/**
+ * Import single template
+ */
+function etkm_import_single_template( $template_data ) {
+	$defaults = array(
+		'title' => __( 'Imported Template', 'elementor-template-kit-manager' ),
+		'type' => 'page',
+		'content' => array()
+	);
+	
+	$template_data = wp_parse_args( $template_data, $defaults );
+	
+	// Create new template post
+	$template_id = wp_insert_post( array(
+		'post_title' => $template_data['title'],
+		'post_type' => 'elementor_library',
+		'post_status' => 'publish',
+		'meta_input' => array(
+			'_elementor_data' => wp_json_encode( $template_data['content'] ),
+			'_elementor_template_type' => $template_data['type'],
+			'_elementor_edit_mode' => 'builder'
+		)
+	) );
+	
+	if ( is_wp_error( $template_id ) ) {
+		return $template_id;
+	}
+	
+	return $template_id;
+}
+
+/**
+ * Handle template kit deletion via AJAX
+ */
+function etkm_handle_delete() {
+	check_ajax_referer( 'etkm_nonce', 'nonce' );
+	
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'elementor-template-kit-manager' ) ) );
+	}
+	
+	$filename = isset( $_POST['filename'] ) ? sanitize_file_name( $_POST['filename'] ) : '';
+	
+	if ( empty( $filename ) ) {
+		wp_send_json_error( array( 'message' => __( 'Invalid filename.', 'elementor-template-kit-manager' ) ) );
+	}
+	
+	$upload_dir = etkm_get_upload_dir();
+	$filepath = $upload_dir . '/' . $filename;
+	
+	if ( ! file_exists( $filepath ) ) {
+		wp_send_json_error( array( 'message' => __( 'File not found.', 'elementor-template-kit-manager' ) ) );
+	}
+	
+	if ( unlink( $filepath ) ) {
+		// Also delete preview image if exists
+		$preview_dir = $upload_dir . '/previews';
+		$base_filename = pathinfo( $filename, PATHINFO_FILENAME );
+		$extensions = array( 'jpg', 'png', 'jpeg' );
+		
+		foreach ( $extensions as $ext ) {
+			$preview_file = $preview_dir . '/' . $base_filename . '.' . $ext;
+			if ( file_exists( $preview_file ) ) {
+				unlink( $preview_file );
+			}
+		}
+		
+		wp_send_json_success( array( 'message' => __( 'Template kit deleted successfully.', 'elementor-template-kit-manager' ) ) );
+	} else {
+		wp_send_json_error( array( 'message' => __( 'Failed to delete file.', 'elementor-template-kit-manager' ) ) );
+	}
+}
+
+/**
+ * Recursively delete directory
+ */
+function etkm_delete_directory( $dir ) {
+	if ( ! is_dir( $dir ) ) {
+		return;
+	}
+	
+	$files = array_diff( scandir( $dir ), array( '.', '..' ) );
+	
+	foreach ( $files as $file ) {
+		$path = $dir . '/' . $file;
+		is_dir( $path ) ? etkm_delete_directory( $path ) : unlink( $path );
+	}
+	
+	rmdir( $dir );
+}]]></content>
+  </file>
+  <file path="src/block.json">
+    <description>This file contains metadata about the block including its name, title, category, icon, and other properties.</description>
+    <content><![CDATA[
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "telex/block-elementor-template-kit-manager",
+	"version": "0.1.0",
+	"title": "Elementor Template Kit Manager",
+	"category": "widgets",
+	"icon": "download",
+	"description": "Manage and deploy Elementor template kits stored as ZIP files",
+	"example": {},
+	"supports": {
+		"html": false
+	},
+	"textdomain": "elementor-template-kit-manager",
+	"editorScript": "file:./index.js",
+	"editorStyle": "file:./index.css",
+	"style": "file:./style-index.css",
+	"viewScript": "file:./view.js"
+}
+]]></content>
+  </file>
+  <file path="src/index.js">
+    <description>This file registers the block, specifies the edit and save functions, and loads the block's metadata</description>
+    <content><![CDATA[
+/**
+ * Registers a new block provided a unique name and an object defining its behavior.
+ *
+ * @see https://developer.wordpress.org/block-editor/reference-guides/block-api/block-registration/
+ */
+import { registerBlockType } from '@wordpress/blocks';
+
+/**
+ * Lets webpack process CSS, SASS or SCSS files referenced in JavaScript files.
+ * All files containing `style` keyword are bundled together. The code used
+ * gets applied both to the front of your site and to the editor.
+ *
+ * @see https://www.npmjs.com/package/@wordpress/scripts#using-css
+ */
+import './style.scss';
+
+/**
+ * Internal dependencies
+ */
+import Edit from './edit';
+import save from './save';
+import metadata from './block.json';
+
+/**
+ * Every block starts by registering a new block type definition.
+ *
+ * @see https://developer.wordpress.org/block-editor/reference-guides/block-api/block-registration/
+ */
+registerBlockType( metadata.name, {
+	/**
+	 * @see ./edit.js
+	 */
+	edit: Edit,
+
+	/**
+	 * @see ./save.js
+	 */
+	save,
+} );
+]]></content>
+  </file>
+  <file path="src/edit.js">
+    <description>This file contains the edit function for the block which is responsible for rendering the block in the editor.</description>
+    <content><![CDATA[
+/**
+ * Retrieves the translation of text.
+ *
+ * @see https://developer.wordpress.org/block-editor/reference-guides/packages/packages-i18n/
+ */
+import { __ } from '@wordpress/i18n';
+
+/**
+ * React hook that is used to mark the block wrapper element.
+ * It provides all the necessary props like the class name.
+ *
+ * @see https://developer.wordpress.org/block-editor/reference-guides/packages/packages-block-editor/#useblockprops
+ */
+import { useBlockProps } from '@wordpress/block-editor';
+
+/**
+ * Lets webpack process CSS, SASS or SCSS files referenced in JavaScript files.
+ * Those files can contain any CSS code that gets applied to the editor.
+ *
+ * @see https://www.npmjs.com/package/@wordpress/scripts#using-css
+ */
+import './editor.scss';
+
+/**
+ * The edit function describes the structure of your block in the context of the
+ * editor. This represents what the editor will render when the block is used.
+ *
+ * @see https://developer.wordpress.org/block-editor/reference-guides/block-api/block-edit-save/#edit
+ *
+ * @return {Element} Element to render.
+ */
+export default function Edit() {
+	return (
+		<div { ...useBlockProps() }>
+			<div className="etkm-editor-placeholder">
+				<span className="dashicons dashicons-download"></span>
+				<p>{ __( 'Elementor Template Kit Manager', 'elementor-template-kit-manager' ) }</p>
+				<p className="description">
+					{ __( 'This plugin operates in the WordPress admin area. Visit Template Kits in the admin menu to manage your template kits.', 'elementor-template-kit-manager' ) }
+				</p>
+			</div>
+		</div>
+	);
+}
+]]></content>
+  </file>
+  <file path="src/save.js">
+    <description>This file contains the save function for the block which is responsible for creating the static result of rendering the block on the client to display the saved result on the front end.</description>
+    <content><![CDATA[
+/**
+ * React hook that is used to mark the block wrapper element.
+ * It provides all the necessary props like the class name.
+ *
+ * @see https://developer.wordpress.org/block-editor/reference-guides/packages/packages-block-editor/#useblockprops
+ */
+import { useBlockProps } from '@wordpress/block-editor';
+
+/**
+ * The save function defines the way in which the different attributes should
+ * be combined into the final markup, which is then serialized by the block
+ * editor into `post_content`.
+ *
+ * @see https://developer.wordpress.org/block-editor/reference-guides/block-api/block-edit-save/#save
+ *
+ * @return {Element} Element to render.
+ */
+export default function save() {
+	return (
+		<div { ...useBlockProps.save() }>
+			<p>{ 'This plugin operates in the WordPress admin area only.' }</p>
+		</div>
+	);
+}
+]]></content>
+  </file>
+  <file path="src/style.scss">
+    <description>This file contains styles for the block in the front end.</description>
+    <content><![CDATA[/**
+ * The following styles get applied both on the front of your site
+ * and in the editor.
+ */
+
+.wp-block-telex-block-elementor-template-kit-manager {
+	padding: 20px;
+	text-align: center;
+	background: #f8f9fa;
+	border: 1px solid #ddd;
+	border-radius: 4px;
+}
+
+.etkm-admin-wrap {
+	max-width: 1400px;
+	margin: 20px 0;
+
+	h1 {
+		margin-bottom: 30px;
+	}
+
+	h2 {
+		margin-top: 0;
+		margin-bottom: 20px;
+		font-size: 18px;
+	}
+}
+
+.etkm-upload-section {
+	background: #fff;
+	padding: 30px;
+	margin-bottom: 30px;
+	border: 1px solid #ddd;
+	border-radius: 4px;
+}
+
+.etkm-upload-area {
+	border: 2px dashed #cbd5e1;
+	border-radius: 8px;
+	padding: 40px;
+	text-align: center;
+	transition: all 0.3s ease;
+	background: #f8fafc;
+
+	&.drag-over {
+		border-color: #2563eb;
+		background: #eff6ff;
+	}
+}
+
+.etkm-upload-content {
+	.dashicons {
+		font-size: 64px;
+		width: 64px;
+		height: 64px;
+		color: #64748b;
+		margin-bottom: 16px;
+	}
+
+	p {
+		margin: 8px 0;
+		color: #475569;
+		font-size: 16px;
+	}
+
+	.etkm-or {
+		margin: 16px 0;
+		font-weight: 600;
+		color: #94a3b8;
+	}
+
+	.etkm-file-info {
+		margin-top: 16px;
+		font-size: 14px;
+		color: #94a3b8;
+	}
+}
+
+.etkm-upload-progress {
+	margin-top: 20px;
+
+	.etkm-progress-bar {
+		height: 8px;
+		background: #e2e8f0;
+		border-radius: 4px;
+		overflow: hidden;
+		margin-bottom: 8px;
+	}
+
+	.etkm-progress-fill {
+		height: 100%;
+		background: linear-gradient(90deg, #2563eb, #3b82f6);
+		border-radius: 4px;
+		width: 0%;
+		transition: width 0.3s ease;
+	}
+
+	.etkm-progress-text {
+		text-align: center;
+		font-weight: 600;
+		color: #475569;
+	}
+}
+
+.etkm-kits-section {
+	background: #fff;
+	padding: 30px;
+	border: 1px solid #ddd;
+	border-radius: 4px;
+}
+
+.etkm-section-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 24px;
+
+	h2 {
+		margin: 0;
+	}
+}
+
+.etkm-view-toggle {
+	display: flex;
+	gap: 8px;
+}
+
+.etkm-view-btn {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 12px;
+	border: 1px solid #ddd;
+	border-radius: 4px;
+	background: #fff;
+	cursor: pointer;
+	font-size: 14px;
+	color: #475569;
+	transition: all 0.2s ease;
+
+	.dashicons {
+		width: 18px;
+		height: 18px;
+		font-size: 18px;
+	}
+
+	&:hover {
+		border-color: #2563eb;
+		color: #2563eb;
+	}
+
+	&.active {
+		background: #2563eb;
+		color: #fff;
+		border-color: #2563eb;
+	}
+}
+
+.etkm-kits-list {
+	min-height: 200px;
+
+	&.etkm-gallery-view {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+		gap: 24px;
+	}
+
+	&.etkm-list-view {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+	}
+}
+
+.etkm-loading {
+	text-align: center;
+	padding: 40px;
+	grid-column: 1 / -1;
+
+	.spinner {
+		float: none;
+		margin: 0 auto 16px;
+	}
+
+	p {
+		color: #64748b;
+	}
+}
+
+.etkm-gallery-card {
+	background: #fff;
+	border: 1px solid #e2e8f0;
+	border-radius: 8px;
+	overflow: hidden;
+	transition: all 0.3s ease;
+	cursor: pointer;
+	position: relative;
+
+	&:hover {
+		border-color: #2563eb;
+		box-shadow: 0 8px 24px rgba(37, 99, 235, 0.15);
+		transform: translateY(-4px);
+
+		.etkm-card-actions {
+			opacity: 1;
+		}
+
+		.etkm-add-image-btn {
+			opacity: 1;
+		}
+	}
+
+	&.selected {
+		border-color: #2563eb;
+		border-width: 2px;
+		box-shadow: 0 4px 16px rgba(37, 99, 235, 0.2);
+
+		.etkm-card-preview::after {
+			content: '';
+			position: absolute;
+			top: 12px;
+			right: 12px;
+			width: 32px;
+			height: 32px;
+			background: #2563eb;
+			border-radius: 50%;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+		}
+
+		.etkm-card-preview::before {
+			content: '\f147';
+			position: absolute;
+			top: 12px;
+			right: 12px;
+			width: 32px;
+			height: 32px;
+			z-index: 1;
+			font-family: dashicons;
+			font-size: 20px;
+			color: #fff;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+		}
+	}
+}
+
+.etkm-card-preview {
+	position: relative;
+	width: 100%;
+	height: 200px;
+	background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+
+	img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+
+	.etkm-placeholder-icon {
+		font-size: 64px;
+		width: 64px;
+		height: 64px;
+		color: rgba(255, 255, 255, 0.8);
+	}
+}
+
+.etkm-add-image-btn {
+	position: absolute;
+	top: 12px;
+	left: 12px;
+	background: rgba(255, 255, 255, 0.95);
+	border: none;
+	border-radius: 6px;
+	padding: 8px 12px;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	cursor: pointer;
+	font-size: 13px;
+	font-weight: 500;
+	color: #1e293b;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+	transition: all 0.2s ease;
+	opacity: 0;
+	z-index: 2;
+
+	.dashicons {
+		width: 18px;
+		height: 18px;
+		font-size: 18px;
+	}
+
+	&:hover {
+		background: #fff;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+		color: #2563eb;
+	}
+
+	&:active {
+		transform: scale(0.95);
+	}
+}
+
+.etkm-card-actions {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+	padding: 16px;
+	display: flex;
+	gap: 8px;
+	justify-content: center;
+	opacity: 0;
+	transition: opacity 0.3s ease;
+
+	.button {
+		padding: 6px 16px;
+		font-size: 13px;
+		line-height: 1.4;
+		height: auto;
+	}
+
+	.button-primary {
+		background: #2563eb;
+		border-color: #2563eb;
+
+		&:hover {
+			background: #1d4ed8;
+			border-color: #1d4ed8;
+		}
+	}
+
+	.button-secondary {
+		background: rgba(255, 255, 255, 0.9);
+		border-color: rgba(255, 255, 255, 0.9);
+		color: #1e293b;
+
+		&:hover {
+			background: #fff;
+			border-color: #fff;
+		}
+	}
+}
+
+.etkm-card-info {
+	padding: 16px;
+
+	h3 {
+		margin: 0 0 8px;
+		font-size: 16px;
+		font-weight: 600;
+		color: #1e293b;
+		line-height: 1.4;
+	}
+
+	.etkm-card-meta {
+		display: flex;
+		gap: 12px;
+		font-size: 13px;
+		color: #64748b;
+		flex-wrap: wrap;
+
+		span {
+			display: flex;
+			align-items: center;
+			gap: 4px;
+
+			.dashicons {
+				width: 16px;
+				height: 16px;
+				font-size: 16px;
+			}
+		}
+	}
+}
+
+/* List view styles */
+.etkm-list-view .etkm-kit-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 20px;
+	border: 1px solid #e2e8f0;
+	border-radius: 6px;
+	background: #fff;
+	transition: all 0.2s ease;
+
+	&:hover {
+		border-color: #cbd5e1;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+	}
+}
+
+.etkm-kit-info {
+	flex: 1;
+
+	h3 {
+		margin: 0 0 8px;
+		font-size: 16px;
+		font-weight: 600;
+		color: #1e293b;
+	}
+
+	.etkm-kit-meta {
+		display: flex;
+		gap: 16px;
+		font-size: 14px;
+		color: #64748b;
+
+		span {
+			display: flex;
+			align-items: center;
+			gap: 4px;
+
+			.dashicons {
+				width: 16px;
+				height: 16px;
+				font-size: 16px;
+			}
+		}
+	}
+}
+
+.etkm-kit-actions {
+	display: flex;
+	gap: 8px;
+
+	.button {
+		white-space: nowrap;
+	}
+}
+
+.etkm-notification {
+	position: fixed;
+	top: 32px;
+	right: 20px;
+	padding: 16px 20px;
+	background: #fff;
+	border-left: 4px solid;
+	border-radius: 4px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+	z-index: 999999;
+	min-width: 300px;
+	max-width: 500px;
+	animation: slideIn 0.3s ease;
+
+	&.success {
+		border-color: #10b981;
+	}
+
+	&.error {
+		border-color: #ef4444;
+	}
+
+	p {
+		margin: 0;
+		font-weight: 500;
+	}
+
+	ul {
+		margin: 8px 0 0;
+		padding-left: 20px;
+
+		li {
+			margin: 4px 0;
+			font-size: 14px;
+		}
+	}
+}
+
+@keyframes slideIn {
+	from {
+		transform: translateX(100%);
+		opacity: 0;
+	}
+	to {
+		transform: translateX(0);
+		opacity: 1;
+	}
+}
+
+.etkm-empty-state {
+	text-align: center;
+	padding: 60px 20px;
+	color: #64748b;
+	grid-column: 1 / -1;
+
+	.dashicons {
+		font-size: 80px;
+		width: 80px;
+		height: 80px;
+		opacity: 0.3;
+		margin-bottom: 16px;
+	}
+
+	h3 {
+		margin: 0 0 8px;
+		font-size: 18px;
+		color: #475569;
+	}
+
+	p {
+		margin: 0;
+		font-size: 14px;
+	}
+}
+
+/* Selection mode styles */
+.etkm-selection-mode {
+	.etkm-gallery-card {
+		cursor: pointer;
+		user-select: none;
+	}
+}]]></content>
+  </file>
+  <file path="src/editor.scss">
+    <description>This file contains styles for the block in the editor.</description>
+    <content><![CDATA[
+/**
+ * The following styles get applied inside the editor only.
+ */
+
+.etkm-editor-placeholder {
+	text-align: center;
+	padding: 40px 20px;
+	background: #f8fafc;
+	border: 2px dashed #cbd5e1;
+	border-radius: 8px;
+
+	.dashicons {
+		font-size: 64px;
+		width: 64px;
+		height: 64px;
+		color: #64748b;
+		margin: 0 auto 16px;
+	}
+
+	p {
+		margin: 8px 0;
+		color: #475569;
+
+		&.description {
+			font-size: 14px;
+			color: #64748b;
+		}
+	}
+}
+]]></content>
+  </file>
+  <file path="src/view.js">
+    <description>This file contains the view function for the block which is responsible for rendering interactive behaviors of the block on the front end.</description>
+    <content><![CDATA[/**
+ * Frontend JavaScript for Elementor Template Kit Manager
+ */
+
+(function() {
+	'use strict';
+
+	if (typeof etkm === 'undefined') {
+		return;
+	}
+
+	const uploadArea = document.getElementById('etkm-upload-area');
+	const fileInput = document.getElementById('etkm-file-input');
+	const selectFileBtn = document.getElementById('etkm-select-file');
+	const kitsList = document.getElementById('etkm-kits-list');
+	let currentView = 'gallery';
+	let selectedKits = new Set();
+	let mediaFrame;
+
+	if (!uploadArea || !fileInput || !selectFileBtn || !kitsList) {
+		return;
+	}
+
+	// Initialize
+	loadKits();
+
+	// View toggle buttons
+	document.querySelectorAll('.etkm-view-btn').forEach(function(btn) {
+		btn.addEventListener('click', function() {
+			const view = this.dataset.view;
+			if (view !== currentView) {
+				currentView = view;
+				document.querySelectorAll('.etkm-view-btn').forEach(b => b.classList.remove('active'));
+				this.classList.add('active');
+				toggleView(view);
+			}
+		});
+	});
+
+	function toggleView(view) {
+		if (view === 'gallery') {
+			kitsList.classList.remove('etkm-list-view');
+			kitsList.classList.add('etkm-gallery-view');
+		} else {
+			kitsList.classList.remove('etkm-gallery-view');
+			kitsList.classList.add('etkm-list-view');
+		}
+		loadKits();
+	}
+
+	// Select file button
+	selectFileBtn.addEventListener('click', function() {
+		fileInput.click();
+	});
+
+	// File input change
+	fileInput.addEventListener('change', function(e) {
+		if (e.target.files.length > 0) {
+			handleFile(e.target.files[0]);
+		}
+	});
+
+	// Drag and drop
+	uploadArea.addEventListener('dragover', function(e) {
+		e.preventDefault();
+		e.stopPropagation();
+		uploadArea.classList.add('drag-over');
+	});
+
+	uploadArea.addEventListener('dragleave', function(e) {
+		e.preventDefault();
+		e.stopPropagation();
+		uploadArea.classList.remove('drag-over');
+	});
+
+	uploadArea.addEventListener('drop', function(e) {
+		e.preventDefault();
+		e.stopPropagation();
+		uploadArea.classList.remove('drag-over');
+
+		const files = e.dataTransfer.files;
+		if (files.length > 0) {
+			handleFile(files[0]);
+		}
+	});
+
+	function handleFile(file) {
+		// Validate file type
+		if (!file.name.endsWith('.zip')) {
+			showNotification(etkm.strings.invalidFile, 'error');
+			return;
+		}
+
+		// Validate file size
+		if (file.size > etkm.maxFileSize) {
+			showNotification(etkm.strings.fileTooLarge, 'error');
+			return;
+		}
+
+		uploadFile(file);
+	}
+
+	function uploadFile(file) {
+		const formData = new FormData();
+		formData.append('action', 'etkm_upload_kit');
+		formData.append('nonce', etkm.nonce);
+		formData.append('file', file);
+
+		// Show progress
+		const uploadContent = uploadArea.querySelector('.etkm-upload-content');
+		const uploadProgress = uploadArea.querySelector('.etkm-upload-progress');
+		uploadContent.style.display = 'none';
+		uploadProgress.style.display = 'block';
+
+		const xhr = new XMLHttpRequest();
+
+		xhr.upload.addEventListener('progress', function(e) {
+			if (e.lengthComputable) {
+				const percentComplete = (e.loaded / e.total) * 100;
+				updateProgress(percentComplete);
+			}
+		});
+
+		xhr.addEventListener('load', function() {
+			if (xhr.status === 200) {
+				try {
+					const response = JSON.parse(xhr.responseText);
+					if (response.success) {
+						showNotification(response.data.message, 'success');
+						loadKits();
+						resetUploadArea();
+					} else {
+						showNotification(response.data.message || etkm.strings.uploadError, 'error');
+						resetUploadArea();
+					}
+				} catch (error) {
+					showNotification(etkm.strings.uploadError, 'error');
+					resetUploadArea();
+				}
+			} else {
+				showNotification(etkm.strings.uploadError, 'error');
+				resetUploadArea();
+			}
+		});
+
+		xhr.addEventListener('error', function() {
+			showNotification(etkm.strings.uploadError, 'error');
+			resetUploadArea();
+		});
+
+		xhr.open('POST', etkm.ajaxUrl);
+		xhr.send(formData);
+	}
+
+	function updateProgress(percent) {
+		const progressFill = document.querySelector('.etkm-progress-fill');
+		const progressText = document.querySelector('.etkm-progress-text');
+		if (progressFill && progressText) {
+			progressFill.style.width = percent + '%';
+			progressText.textContent = Math.round(percent) + '%';
+		}
+	}
+
+	function resetUploadArea() {
+		const uploadContent = uploadArea.querySelector('.etkm-upload-content');
+		const uploadProgress = uploadArea.querySelector('.etkm-upload-progress');
+		setTimeout(function() {
+			uploadContent.style.display = 'block';
+			uploadProgress.style.display = 'none';
+			updateProgress(0);
+			fileInput.value = '';
+		}, 1000);
+	}
+
+	function loadKits() {
+		kitsList.innerHTML = '<div class="etkm-loading"><span class="spinner is-active"></span><p>Loading template kits...</p></div>';
+
+		fetch(etkm.ajaxUrl, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded',
+			},
+			body: new URLSearchParams({
+				action: 'etkm_get_kits',
+				nonce: etkm.nonce
+			})
+		})
+		.then(response => response.json())
+		.then(data => {
+			if (data.success) {
+				renderKits(data.data.kits);
+			} else {
+				kitsList.innerHTML = '<p>Failed to load template kits.</p>';
+			}
+		})
+		.catch(error => {
+			kitsList.innerHTML = '<p>Failed to load template kits.</p>';
+		});
+	}
+
+	function renderKits(kits) {
+		if (kits.length === 0) {
+			kitsList.innerHTML = `
+				<div class="etkm-empty-state">
+					<span class="dashicons dashicons-download"></span>
+					<h3>No Template Kits Yet</h3>
+					<p>Upload your first Elementor template kit to get started.</p>
+				</div>
+			`;
+			return;
+		}
+
+		let html = '';
+		
+		if (currentView === 'gallery') {
+			kits.forEach(function(kit) {
+				const isSelected = selectedKits.has(kit.name);
+				const previewHtml = kit.preview 
+					? `<img src="${escapeHtml(kit.preview)}" alt="${escapeHtml(kit.display_name)}" loading="lazy">`
+					: `<span class="dashicons dashicons-media-document etkm-placeholder-icon"></span>`;
+				
+				html += `
+					<div class="etkm-gallery-card ${isSelected ? 'selected' : ''}" data-filename="${escapeHtml(kit.name)}">
+						<div class="etkm-card-preview">
+							${previewHtml}
+							<button type="button" class="etkm-add-image-btn" data-filename="${escapeHtml(kit.name)}">
+								<span class="dashicons dashicons-format-image"></span>
+								${kit.preview ? 'Change Image' : 'Add Image'}
+							</button>
+							<div class="etkm-card-actions">
+								<button type="button" class="button button-primary etkm-import-btn" data-filename="${escapeHtml(kit.name)}">
+									<span class="dashicons dashicons-download"></span> Import
+								</button>
+								<button type="button" class="button button-secondary etkm-delete-btn" data-filename="${escapeHtml(kit.name)}">
+									<span class="dashicons dashicons-trash"></span> Delete
+								</button>
+							</div>
+						</div>
+						<div class="etkm-card-info">
+							<h3>${escapeHtml(kit.display_name)}</h3>
+							<div class="etkm-card-meta">
+								<span><span class="dashicons dashicons-calendar-alt"></span>${escapeHtml(kit.date)}</span>
+								<span><span class="dashicons dashicons-media-archive"></span>${escapeHtml(kit.size)}</span>
+							</div>
+						</div>
+					</div>
+				`;
+			});
+		} else {
+			kits.forEach(function(kit) {
+				html += `
+					<div class="etkm-kit-item" data-filename="${escapeHtml(kit.name)}">
+						<div class="etkm-kit-info">
+							<h3>${escapeHtml(kit.display_name)}</h3>
+							<div class="etkm-kit-meta">
+								<span><span class="dashicons dashicons-calendar-alt"></span>${escapeHtml(kit.date)}</span>
+								<span><span class="dashicons dashicons-media-archive"></span>${escapeHtml(kit.size)}</span>
+							</div>
+						</div>
+						<div class="etkm-kit-actions">
+							<button type="button" class="button etkm-add-image-btn-list" data-filename="${escapeHtml(kit.name)}">
+								<span class="dashicons dashicons-format-image"></span> ${kit.preview ? 'Change' : 'Add'} Image
+							</button>
+							<button type="button" class="button button-primary etkm-import-btn" data-filename="${escapeHtml(kit.name)}">
+								<span class="dashicons dashicons-download"></span> Import
+							</button>
+							<button type="button" class="button etkm-delete-btn" data-filename="${escapeHtml(kit.name)}">
+								<span class="dashicons dashicons-trash"></span> Delete
+							</button>
+						</div>
+					</div>
+				`;
+			});
+		}
+
+		kitsList.innerHTML = html;
+
+		// Attach event listeners
+		if (currentView === 'gallery') {
+			document.querySelectorAll('.etkm-gallery-card').forEach(function(card) {
+				card.addEventListener('click', function(e) {
+					if (!e.target.closest('.etkm-import-btn') && 
+						!e.target.closest('.etkm-delete-btn') && 
+						!e.target.closest('.etkm-add-image-btn')) {
+						const filename = this.dataset.filename;
+						if (selectedKits.has(filename)) {
+							selectedKits.delete(filename);
+							this.classList.remove('selected');
+						} else {
+							selectedKits.add(filename);
+							this.classList.add('selected');
+						}
+					}
+				});
+			});
+		}
+
+		document.querySelectorAll('.etkm-import-btn').forEach(function(btn) {
+			btn.addEventListener('click', handleImport);
+		});
+
+		document.querySelectorAll('.etkm-delete-btn').forEach(function(btn) {
+			btn.addEventListener('click', handleDelete);
+		});
+
+		document.querySelectorAll('.etkm-add-image-btn').forEach(function(btn) {
+			btn.addEventListener('click', handleAddImage);
+		});
+
+		document.querySelectorAll('.etkm-add-image-btn-list').forEach(function(btn) {
+			btn.addEventListener('click', handleAddImage);
+		});
+	}
+
+	function handleAddImage(e) {
+		e.stopPropagation();
+		const btn = e.currentTarget;
+		const filename = btn.dataset.filename;
+
+		// Create WordPress media frame if it doesn't exist
+		if (!mediaFrame) {
+			mediaFrame = wp.media({
+				title: 'Select or Upload Image',
+				button: {
+					text: 'Use this image'
+				},
+				multiple: false,
+				library: {
+					type: 'image'
+				}
+			});
+		}
+
+		// Remove previous event listeners
+		mediaFrame.off('select');
+
+		// When an image is selected
+		mediaFrame.on('select', function() {
+			const attachment = mediaFrame.state().get('selection').first().toJSON();
+			uploadImage(filename, attachment.id);
+		});
+
+		// Open the media frame
+		mediaFrame.open();
+	}
+
+	function uploadImage(kitFilename, imageId) {
+		fetch(etkm.ajaxUrl, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded',
+			},
+			body: new URLSearchParams({
+				action: 'etkm_upload_image',
+				nonce: etkm.nonce,
+				kit_filename: kitFilename,
+				image_id: imageId
+			})
+		})
+		.then(response => response.json())
+		.then(data => {
+			if (data.success) {
+				showNotification(data.data.message, 'success');
+				loadKits();
+			} else {
+				showNotification(data.data.message || etkm.strings.imageUploadError, 'error');
+			}
+		})
+		.catch(error => {
+			showNotification(etkm.strings.imageUploadError, 'error');
+		});
+	}
+
+	function handleImport(e) {
+		e.stopPropagation();
+		const btn = e.currentTarget;
+		const filename = btn.dataset.filename;
+		const originalText = btn.innerHTML;
+
+		if (btn.disabled) {
+			return;
+		}
+
+		btn.disabled = true;
+		btn.innerHTML = '<span class="spinner is-active" style="float: none; margin: 0 8px 0 0;"></span>Importing...';
+
+		fetch(etkm.ajaxUrl, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded',
+			},
+			body: new URLSearchParams({
+				action: 'etkm_import_kit',
+				nonce: etkm.nonce,
+				filename: filename
+			})
+		})
+		.then(response => response.json())
+		.then(data => {
+			if (data.success) {
+				let message = data.data.message;
+				if (data.data.imported && data.data.imported.length > 0) {
+					message += '<ul>';
+					data.data.imported.forEach(function(template) {
+						message += '<li>' + escapeHtml(template.title) + ' (' + escapeHtml(template.type) + ')</li>';
+					});
+					message += '</ul>';
+				}
+				showNotification(message, 'success');
+			} else {
+				showNotification(data.data.message || etkm.strings.importError, 'error');
+			}
+			btn.disabled = false;
+			btn.innerHTML = originalText;
+		})
+		.catch(error => {
+			showNotification(etkm.strings.importError, 'error');
+			btn.disabled = false;
+			btn.innerHTML = originalText;
+		});
+	}
+
+	function handleDelete(e) {
+		e.stopPropagation();
+		const btn = e.currentTarget;
+		const filename = btn.dataset.filename;
+
+		if (!confirm(etkm.strings.deleteConfirm)) {
+			return;
+		}
+
+		const originalText = btn.innerHTML;
+		btn.disabled = true;
+		btn.innerHTML = '<span class="spinner is-active" style="float: none; margin: 0;"></span>';
+
+		fetch(etkm.ajaxUrl, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/x-www-form-urlencoded',
+			},
+			body: new URLSearchParams({
+				action: 'etkm_delete_kit',
+				nonce: etkm.nonce,
+				filename: filename
+			})
+		})
+		.then(response => response.json())
+		.then(data => {
+			if (data.success) {
+				showNotification(data.data.message, 'success');
+				selectedKits.delete(filename);
+				loadKits();
+			} else {
+				showNotification(data.data.message || 'Failed to delete template kit.', 'error');
+				btn.disabled = false;
+				btn.innerHTML = originalText;
+			}
+		})
+		.catch(error => {
+			showNotification('Failed to delete template kit.', 'error');
+			btn.disabled = false;
+			btn.innerHTML = originalText;
+		});
+	}
+
+	function showNotification(message, type) {
+		const notification = document.getElementById('etkm-notification');
+		if (!notification) {
+			return;
+		}
+
+		notification.className = 'etkm-notification ' + type;
+		notification.innerHTML = '<p>' + message + '</p>';
+		notification.style.display = 'block';
+
+		setTimeout(function() {
+			notification.style.display = 'none';
+		}, 5000);
+	}
+
+	function escapeHtml(text) {
+		const div = document.createElement('div');
+		div.textContent = text;
+		return div.innerHTML;
+	}
+})();]]></content>
+  </file>
+</artefact>

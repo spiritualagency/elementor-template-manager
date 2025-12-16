@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "telex/block-elementor-template-kit-manager",
+  "version": "0.1.0",
+  "title": "Elementor Template Kit Manager",
+  "category": "widgets",
+  "icon": "download",
+  "description": "Manage and deploy Elementor template kits stored as ZIP files",
+  "example": {},
+  "supports": {
+    "html": false
+  },
+  "textdomain": "elementor-template-kit-manager",
+  "editorScript": "file:./index.js",
+  "editorStyle": "file:./index.css",
+  "style": "file:./style-index.css",
+  "viewScript": "file:./view.js"
+}

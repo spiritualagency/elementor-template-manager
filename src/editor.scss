@@ -1,0 +1,30 @@
+
+/**
+ * The following styles get applied inside the editor only.
+ */
+
+.etkm-editor-placeholder {
+	text-align: center;
+	padding: 40px 20px;
+	background: #f8fafc;
+	border: 2px dashed #cbd5e1;
+	border-radius: 8px;
+
+	.dashicons {
+		font-size: 64px;
+		width: 64px;
+		height: 64px;
+		color: #64748b;
+		margin: 0 auto 16px;
+	}
+
+	p {
+		margin: 8px 0;
+		color: #475569;
+
+		&.description {
+			font-size: 14px;
+			color: #64748b;
+		}
+	}
+}
